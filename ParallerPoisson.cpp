@@ -6,14 +6,13 @@
 
 using namespace std;
 
-const int N=20;
-void initGrid(int,double,double **);
+const int N=10;
+void initGrid(int,double,double**);
 void blackDots(double**,double**,double,double ,int,int,int,int,int );
 void redDots(double**,double**,double,double,int,int,int,int,int);
 void printGrid(double**);
 
-double **allocate( int nRows, int nCols)
-{
+double **allocate( int nRows, int nCols){
       double **dynamicArray;
 
       dynamicArray = new double*[nRows];
@@ -25,7 +24,6 @@ double **allocate( int nRows, int nCols)
 
 
 
-
 int main(int argc,char ** argv){
   int id,ntasks;
 
@@ -33,7 +31,7 @@ int main(int argc,char ** argv){
   MPI_Init(&argc,&argv);
   MPI_Comm_rank(MPI_COMM_WORLD,&id);
   MPI_Comm_size(MPI_COMM_WORLD,&ntasks);
- MPI_Request send_request, recv_request;
+  MPI_Request send_request, recv_request;
   MPI_Status status;
   
   
@@ -50,14 +48,13 @@ int main(int argc,char ** argv){
      printGrid(grid);
 
   }
-  int iterations = 2;
+  int iterations = 400000;
   double relPara = 0.5;
   int redOrBlack=0;
-  double g = 2;
+  double g = 0;
   int j=0;
   double **oldGrid=0;
   oldGrid=allocate(N,N);
-  
   for(int i=0;i<N;i++){
     for(int j=0;j<N;j++){
       oldGrid[i][j]=grid[i][j];
@@ -70,14 +67,11 @@ int main(int argc,char ** argv){
  
  
   for(int t=0;t<iterations;t++){
-    if(id % 2 == 0 || id ==0){
-    blackDots(grid,oldGrid,relPara,g, N,lowRow,highRow,id,ntasks);
+
     redDots(grid,oldGrid,relPara,g, N,lowRow,highRow,id,ntasks);
-    }else{
-       redDots(grid,oldGrid,relPara,g, N,lowRow,highRow,id,ntasks);
-       blackDots(grid,oldGrid,relPara,g, N,lowRow,highRow,id,ntasks);
-    }
+    blackDots(grid,oldGrid,relPara,g, N,lowRow,highRow,id,ntasks);
   
+ 
   
     for(int i=0;i<N;i++){
       for(int j=0;j<N;j++){
@@ -86,30 +80,47 @@ int main(int argc,char ** argv){
     }
 
   }
-  //cout<<"c"<<endl;
-  double gridPart[N][N];
+  MPI_Barrier(MPI_COMM_WORLD);
+  
+  double **gridPart;
+  gridPart=allocate(N,N);
    if(id>0){
-    for(int i = 1;i<ntasks;i++){
-      //MPI_Sendrecv(grid,N*N,MPI_DOUBLE,0,0,gridPart,N*N,MPI_INT,i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-      MPI_Send(grid,N*N,MPI_DOUBLE,0,0,MPI_COMM_WORLD);
-       
-    }
-    }
-  
-  if(id==0){
  
-    for(int idn=1;idn<ntasks;idn++){
-      MPI_Recv(gridPart,N*N,MPI_DOUBLE,idn,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-  
-      for(int i=0;i<N;i++){
-	for(int j= rows*idn;j<rows*idn+rows;j++){
-	  grid[j][i]=gridPart[j][i];
-	}
-      }
+      //MPI_Sendrecv(grid,N*N,MPI_DOUBLE,0,0,gridPart,N*N,MPI_INT,i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+     if(id==4){
+       cout<<"id="<<id<<" count="<<N*N<<endl;
+       cout<<"lähetettävä:"<<endl;
+       printGrid(grid);
+     }
+     MPI_Isend(&(grid[0][0]),N*N,MPI_DOUBLE,0,0,MPI_COMM_WORLD,&send_request);
+     
+     MPI_Wait(&send_request,&status);
+    
     }
-  }
+   MPI_Barrier(MPI_COMM_WORLD);
+   if(id==0){
+ 
+     for(int idn=1;idn<ntasks;idn++){
+       //printGrid(gridPart);
+       if(idn==4){
+       cout<<"idn="<<idn<<" count="<<N*N<<endl;
+       }
+       MPI_Irecv(&(gridPart[0][0]),N*N,MPI_DOUBLE,idn,0,MPI_COMM_WORLD,&recv_request);
+       if(idn==4){
+       cout<<"Vastaanotto"<<endl;
+       printGrid(gridPart);
+       }
+       cout<<"\n";
+       for(int j= rows*idn;j<rows*idn+rows;j++){
+	 for(int i=0;i<N;i++){
+	   grid[j][i]=gridPart[j][i];
+	   
+	 }
+       }
+     }
+   }
 
-      
+        
      
     
   if(id==0){
@@ -123,12 +134,12 @@ int main(int argc,char ** argv){
 }
 
 
-void initGrid(int s,double bound,double **grid){
+void initGrid(int s,double bound,double ** grid){
   mt19937 rnd(453);
  
   for(int i=1;i<s-1;i++){
     for(int j=1;j<s-1;j++){
-      grid[i][j]=(double)rnd()/rnd.max();
+      grid[i][j]=0;//(double)rnd()/rnd.max();
     }
   }
   
@@ -143,14 +154,11 @@ void initGrid(int s,double bound,double **grid){
   
 }
 
-void redDots(double **grid,double **oldGrid,double relPara, double g,int s,int lowRow, int highRow,int id,int ntasks){
+void redDots(double ** grid,double ** oldGrid,double relPara, double g,int s,int lowRow, int highRow,int id,int ntasks){
   int j=highRow;
   int row = 1;
-  double upper[1];
-  upper[0]=1;
-  
-  double lower[1];
-  lower[0]=1;
+  double *upper=new double[1];
+  double *lower=new double[1];
   MPI_Request send_request, recv_request;
   MPI_Status status;
   int limit = lowRow;
@@ -160,31 +168,31 @@ void redDots(double **grid,double **oldGrid,double relPara, double g,int s,int l
    if(highRow == 0){
     highRow=1;
   }
-  
+   j=highRow;
   while(j<=limit){
-    cout<<"red"<<endl;
-    if(j %2 == 0  ){
+    
+    if(j %2 == 0  && j != 0){
        
       for(int i=1;i<s-1;i+=2){
 	if(j==lowRow && id != ntasks-1){
 	  //MPI_Sendrecv(&oldGrid[i][j],1,MPI_DOUBLE,id-1,0,&upper[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-	  MPI_Isend(&oldGrid[j][i],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&send_request);
+	  MPI_Isend(&(grid[j][i]),1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&send_request);
 	  MPI_Wait(&send_request,&status);
 	}
-	if(j== lowRow && id != 0){
-	  MPI_Irecv(&upper[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&recv_request);
-	  cout<<"upper"<<upper[0]<<endl;
+	if(j== highRow && id != ntasks-1){
+	  MPI_Irecv(&(upper[0]),1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&recv_request);
+
 	}
       
 	if(j == highRow && id != 0){
 	  //  MPI_Sendrecv(&grid[i][j],1,MPI_DOUBLE,id+1,0,&lower[0],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-	   MPI_Isend(&oldGrid[j][i],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&send_request);
+	  MPI_Isend(&(oldGrid[j][i]),1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&send_request);
 	  MPI_Wait(&send_request,&status);
 	}
-	if(j == highRow && id != ntasks-1){
-	  MPI_Irecv(&upper[0],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&recv_request);
+	if(j == lowRow && id != 0){
+	  MPI_Irecv(&lower[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&recv_request);
 
-	}
+	  }
 	if(j==lowRow & id != ntasks-1){
 	  grid[j][i]=(1-relPara)*oldGrid[j][i]+(relPara/4)*(oldGrid[j+1][i]+grid[j-1][i]+oldGrid[j][i+1]+lower[0])-relPara/(4*s*s)*g;
 	}else if( j== highRow && id != 0){
@@ -197,27 +205,27 @@ void redDots(double **grid,double **oldGrid,double relPara, double g,int s,int l
 	}
       }
       row=0;
-    }else{
+    }else if(j != 0 && j%2!= 0){
       for(int i=2;i<s-1;i+=2){
 	if(j==lowRow && id != ntasks-1){
 	  //MPI_Sendrecv(&oldGrid[i][j],1,MPI_DOUBLE,id-1,0,&upper[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-	  MPI_Isend(&oldGrid[j][i],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&send_request);
+	  MPI_Isend(&(grid[j][i]),1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&send_request);
 	  MPI_Wait(&send_request,&status);
 	}
-	if(j== highRow && id != 0){
+	if(j== highRow && id != ntasks-1){
 	  MPI_Irecv(&upper[0],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&recv_request);
 
 	}
       
 	if(j == highRow && id != 0){
 	  //  MPI_Sendrecv(&grid[i][j],1,MPI_DOUBLE,id+1,0,&lower[0],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-	  MPI_Isend(&oldGrid[j][i],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&send_request);
+	  MPI_Isend(&(oldGrid[j][i]),1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&send_request);
 	  MPI_Wait(&send_request,&status);
 	}
-	if(j == lowRow && id != ntasks-1){
-	  MPI_Irecv(&upper[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&recv_request);
+	if(j == lowRow && id != 0){
+	  MPI_Irecv(&lower[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&recv_request);
 
-	}
+	  }
 	if(j==lowRow & id != ntasks-1){
 	  grid[j][i]=(1-relPara)*oldGrid[j][i]+(relPara/4)*(oldGrid[j+1][i]+grid[j-1][i]+oldGrid[j][i+1]+lower[0])-relPara/(4*s*s)*g;
 	}else if( j== highRow && id != 0){
@@ -233,7 +241,7 @@ void redDots(double **grid,double **oldGrid,double relPara, double g,int s,int l
      
     }
   j++;
-    
+   
   }
   
 }
@@ -241,10 +249,11 @@ void redDots(double **grid,double **oldGrid,double relPara, double g,int s,int l
 
 
   
-void blackDots(double **grid, double **oldGrid,double relPara, double g,int s,int lowRow,int highRow,int id,int ntasks){
+void blackDots(double **  grid, double ** oldGrid,double relPara, double g,int s,int lowRow,int highRow,int id,int ntasks){
   int j=highRow;
   int row = 1;
-  double upper[1],lower[1];
+  double *upper = new double[1];
+  double *lower = new double[1];
 
   MPI_Request send_request, recv_request;
   MPI_Status status;
@@ -255,32 +264,33 @@ void blackDots(double **grid, double **oldGrid,double relPara, double g,int s,in
   if(highRow == 0){
     highRow=1;
   }
+  j=highRow;
   while(j<=limit){
     
-    cout<<j<<endl;
-    if(j %2==0){
+    
+    if(j %2!=0 && j != 0){
     
       for(int i=1;i<s-1;i+=2){
 	if(j==lowRow && id != ntasks-1){
 	  //MPI_Sendrecv(&oldGrid[i][j],1,MPI_DOUBLE,id-1,0,&upper[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-	  MPI_Isend(&oldGrid[i][j],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&send_request);
+	  MPI_Isend(&(grid[j][i]),1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&send_request);
 	  MPI_Wait(&send_request,&status);
 	}
-	if(j== highRow && id != 0){
+	if(j== highRow && id != ntasks-1){
 	  MPI_Irecv(&upper[0],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&recv_request);
 
 	}
       
 	if(j == highRow && id != 0){
 	  //  MPI_Sendrecv(&grid[i][j],1,MPI_DOUBLE,id+1,0,&lower[0],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-	   MPI_Isend(&oldGrid[i][j],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&send_request);
+	  MPI_Isend(&(oldGrid[j][i]),1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&send_request);
 	  MPI_Wait(&send_request,&status);
 	}
-	if(j == lowRow && id != ntasks-1){
-	  MPI_Irecv(&upper[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&recv_request);
+	if(j == lowRow && id != 0){
+	  MPI_Irecv(&lower[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&recv_request);
 
 	  }
-		if(j==lowRow & id != ntasks-1){
+	if(j==lowRow & id != ntasks-1){
 	  grid[j][i]=(1-relPara)*oldGrid[j][i]+(relPara/4)*(oldGrid[j+1][i]+grid[j-1][i]+oldGrid[j][i+1]+lower[0])-relPara/(4*s*s)*g;
 	}else if( j== highRow && id != 0){
 	  grid[j][i]=(1-relPara)*oldGrid[j][i]+(relPara/4)*(oldGrid[j+1][i]+grid[j-1][i]+upper[0]+grid[j][i-1])-relPara/(4*s*s)*g;
@@ -292,27 +302,27 @@ void blackDots(double **grid, double **oldGrid,double relPara, double g,int s,in
 	}
       }
       
-    }else{
+    }else if( j%2==0 && j!= 0){
    
       for(int i=2;i<s-1;i+=2){
       
-       if(j==lowRow && id != ntasks-1){
+      if(j==lowRow && id != ntasks-1){
 	  //MPI_Sendrecv(&oldGrid[i][j],1,MPI_DOUBLE,id-1,0,&upper[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-	  MPI_Isend(&oldGrid[i][j],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&send_request);
+	MPI_Isend(&(grid[j][i]),1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&send_request);
 	  MPI_Wait(&send_request,&status);
 	}
-	if(j== highRow && id != 0){
+	if(j== highRow && id != ntasks-1){
 	  MPI_Irecv(&upper[0],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&recv_request);
 
 	}
       
 	if(j == highRow && id != 0){
 	  //  MPI_Sendrecv(&grid[i][j],1,MPI_DOUBLE,id+1,0,&lower[0],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-	   MPI_Isend(&oldGrid[i][j],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&send_request);
+	   MPI_Isend(&oldGrid[j][i],1,MPI_DOUBLE,id-1,0,MPI_COMM_WORLD,&send_request);
 	  MPI_Wait(&send_request,&status);
 	}
-	if(j == lowRow && id != ntasks-1){
-	  MPI_Irecv(&upper[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&recv_request);
+	if(j == lowRow && id != 0){
+	  MPI_Irecv(&lower[0],1,MPI_DOUBLE,id+1,0,MPI_COMM_WORLD,&recv_request);
 
 	  }
 	if(j==lowRow & id != ntasks-1){
@@ -337,7 +347,7 @@ void blackDots(double **grid, double **oldGrid,double relPara, double g,int s,in
   
 }
 
-void printGrid(double **grid){
+void printGrid(double ** grid){
   
   for(int i=0;i<N;i++){
     for(int j=0;j<N;j++){
